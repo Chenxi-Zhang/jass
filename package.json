@@ -1,0 +1,129 @@
+{
+    "name": "helloworld",
+    "displayName": "helloWorld",
+    "description": "",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.50.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onCommand:helloworld.helloWorld"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "configuration": {
+            "type": "object",
+            "title": "Jass",
+            "properties": {
+                "jass.common_j": {
+                    "type": "string",
+                    "description": "自定义common.j,不设置时默认使用插件提供的common.j(需要重启)\n(Customize common.j, using the common.j provided by the plug-in by default when not set)"
+                },
+                "jass.blizzard": {
+                    "type": "string",
+                    "description": "自定义blizzard.j(test)"
+                },
+                "jass.common_ai": {
+                    "type": "string",
+                    "description": "自定义common.j(test)"
+                },
+                "jass.dzapi": {
+                    "type": "string",
+                    "description": "自定义dzapi.j(test)"
+                },
+                "jass.includes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "包含路徑或文件(如：ydwe，japi等,需要重启),插件會找到.j|.ai\n(Contains a path or file (such as ydwe, japi, etc.) that the plug-in will find. J |.ai)"
+                },
+                "jass.diagnostic.support": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "是否开始错误检查\n(Whether to start error checking (currently only support call checking))"
+                },
+                "jass.format.indent.support": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "是否开始缩进格式化（如果你文件包含非jass语法，建议关闭）\n(Whether to start indenting formatting)"
+                },
+                "jass.support.zinc": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "是否支持zinc(暂时无效)\n(Whether to support Zinc)"
+                }
+            }
+        },
+        "languages": [
+            {
+                "id": "jass",
+                "aliases": [
+                    "jass",
+                    "jass2"
+                ],
+                "extensions": [
+                    ".j",
+                    ".ai"
+                ],
+                "configuration": "./src/jass-configuration.json"
+            },
+            {
+                "id": "lua",
+                "extensions": [
+                    ".lua"
+                ]
+            }
+        ],
+        "grammars": [
+            {
+                "scopeName": "source.jass",
+                "language": "jass",
+                "path": "./src/jass.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "jass",
+                "path": "./src/snippets.json"
+            }
+        ],
+        "documentFormattingProvider": "true",
+        "productIconTheme": [
+            {
+                "id": "jass",
+                "label": "jass",
+                "path": "./src/jass-product-icon-theme.json"
+            }
+        ],
+        "enableProposedApi": true,
+        "commands": [
+            {
+                "command": "helloworld.helloWorld",
+                "title": "Hello World"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "lint": "eslint src --ext ts",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/glob": "^7.1.3",
+        "@types/mocha": "^5.2.7",
+        "@types/node": "^12.11.7",
+        "@types/vscode": "^1.50.0",
+        "@typescript-eslint/eslint-plugin": "^4.1.1",
+        "@typescript-eslint/parser": "^4.1.1",
+        "eslint": "^7.9.0",
+        "typescript": "^3.7.4",
+        "vscode-test": "^1.4.0"
+    }
+}
