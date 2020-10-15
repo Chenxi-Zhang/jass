@@ -200,10 +200,10 @@ vscode.languages.registerDocumentFormattingEditProvider("jass", new class Docume
       try {
         if (((token.isId() && next_token.isId()) || (isValue(token) && next_token.isId())) &&
           token.loc && next_token.loc &&
-          Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.startPosition) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.endPosition) &&
-          Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.startPosition) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.endPosition) &&
-          token.loc.endLine == next_token.loc.startLine && <number>next_token.loc.startPosition - <number>token.loc.endPosition > 1) {
-          const textEdit = vscode.TextEdit.replace(new vscode.Range(<number>token.loc.endLine, <number>token.loc.endPosition, <number>next_token.loc.startLine, <number>next_token.loc.startPosition), " ");
+          Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.start) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.end) &&
+          Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.start) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.end) &&
+          token.loc.endLine == next_token.loc.startLine && <number>next_token.loc.start - <number>token.loc.end > 1) {
+          const textEdit = vscode.TextEdit.replace(new vscode.Range(<number>token.loc.endLine, <number>token.loc.end, <number>next_token.loc.startLine, <number>next_token.loc.start), " ");
           textEdits.push(textEdit);
         }
        
@@ -219,14 +219,14 @@ vscode.languages.registerDocumentFormattingEditProvider("jass", new class Docume
         const c7 = token.value === "-";
         const c8 = c6 && c7;
 
-        const c9 = token.loc && next_token.loc && Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.startPosition) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.endPosition) && Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.startPosition) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.endPosition);
+        const c9 = token.loc && next_token.loc && Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.start) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.end) && Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.start) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.end);
 
-        const c10 = <number>token.loc?.endLine == <number>next_token.loc?.startLine && <number>next_token.loc?.startPosition - <number>token.loc?.endPosition > 0;
+        const c10 = <number>token.loc?.endLine == <number>next_token.loc?.startLine && <number>next_token.loc?.start - <number>token.loc?.end > 0;
 
         const c11 = (c2 || c5 || c8) && c9 && c10;
 
         if (c11) {
-          const textEdit = vscode.TextEdit.delete(new vscode.Range(<number>token.loc?.endLine, <number>token.loc?.endPosition, <number>next_token.loc?.startLine, <number>next_token.loc?.startPosition));
+          const textEdit = vscode.TextEdit.delete(new vscode.Range(<number>token.loc?.endLine, <number>token.loc?.end, <number>next_token.loc?.startLine, <number>next_token.loc?.start));
           textEdits.push(textEdit);
         }
 
@@ -238,43 +238,43 @@ vscode.languages.registerDocumentFormattingEditProvider("jass", new class Docume
         const b5 = next_token.value === "+" || next_token.value === "-" || next_token.value === "*" || next_token.value === "/" || next_token.value === ">" || next_token.value === "<" || next_token.value === ">=" || next_token.value === "<=" || next_token.value === "==" || next_token.value === "->" || next_token.value === "=" || next_token.value === "!=" || next_token.value === "||" || next_token.value === "&&";
         const b6 = b4 && b5;
 
-        const b7 = token.loc && next_token.loc && Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.startPosition) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.endPosition) &&
-        Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.startPosition) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.endPosition);
+        const b7 = token.loc && next_token.loc && Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.start) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.end) &&
+        Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.start) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.end);
 
         const b8 = (b3 || b6) && b7;
 
-        const b9 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.startPosition - <number>token.loc?.endPosition === 0;
-        const b10 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.startPosition - <number>token.loc?.endPosition > 1;
+        const b9 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.start - <number>token.loc?.end === 0;
+        const b10 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.start - <number>token.loc?.end > 1;
 
         const b11 = b8 && (b9 || b10);
 
         if (b11) {
-          const textEdit = vscode.TextEdit.replace(new vscode.Range(<number>token.loc?.endLine, <number>token.loc?.endPosition, <number>next_token.loc?.startLine, <number>next_token.loc?.startPosition), " ");
+          const textEdit = vscode.TextEdit.replace(new vscode.Range(<number>token.loc?.endLine, <number>token.loc?.end, <number>next_token.loc?.startLine, <number>next_token.loc?.start), " ");
           textEdits.push(textEdit);
         }
 
         const a1 = token.isOp && next_token.isOp();
         const a2 = /*避免--运算被打乱*/ /*(token.value === "-" && next_token.value === "-") || */ (token.value === ")" && next_token.value === "->");
-        const a3 = token.loc && next_token.loc && Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.startPosition) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.endPosition) &&
-        Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.startPosition) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.endPosition);
-        const a4 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.startPosition - <number>token.loc?.endPosition > 1;
-        const a5 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.startPosition - <number>token.loc?.endPosition === 0;
+        const a3 = token.loc && next_token.loc && Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.start) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.end) &&
+        Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.start) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.end);
+        const a4 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.start - <number>token.loc?.end > 1;
+        const a5 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.start - <number>token.loc?.end === 0;
         const a6 = a1 && a2 && a3 && (a4 || a5);
 
         if (a6) {
-          const textEdit = vscode.TextEdit.replace(new vscode.Range(<number>token.loc?.endLine, <number>token.loc?.endPosition, <number>next_token.loc?.startLine, <number>next_token.loc?.startPosition), " ");
+          const textEdit = vscode.TextEdit.replace(new vscode.Range(<number>token.loc?.endLine, <number>token.loc?.end, <number>next_token.loc?.startLine, <number>next_token.loc?.start), " ");
           textEdits.push(textEdit);
         }
 
         const d1 = token.isOp && next_token.isOp();
         const d2 = (token.value === "(" && next_token.value === ")") || (token.value === "[" && next_token.value === "]") || (token.value === "{" && next_token.value === "}");
-        const d3 = token.loc && next_token.loc && Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.startPosition) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.endPosition) &&
-        Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.startPosition) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.endPosition);
-        const d4 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.startPosition - <number>token.loc?.endPosition > 1;
+        const d3 = token.loc && next_token.loc && Number.isInteger(token.loc.startLine) && Number.isInteger(token.loc.start) && Number.isInteger(token.loc.endLine) && Number.isInteger(token.loc.end) &&
+        Number.isInteger(next_token.loc.startLine) && Number.isInteger(next_token.loc.start) && Number.isInteger(next_token.loc.endLine) && Number.isInteger(next_token.loc.end);
+        const d4 = <number>token.loc?.endLine === <number>next_token.loc?.startLine && <number>next_token.loc?.start - <number>token.loc?.end > 1;
         const d5 = d1 && d2 && d3 && d4;
 
         if (d5) {
-          const textEdit = vscode.TextEdit.delete(new vscode.Range(<number>token.loc?.endLine, <number>token.loc?.endPosition, <number>next_token.loc?.startLine, <number>next_token.loc?.startPosition));
+          const textEdit = vscode.TextEdit.delete(new vscode.Range(<number>token.loc?.endLine, <number>token.loc?.end, <number>next_token.loc?.startLine, <number>next_token.loc?.start));
           textEdits.push(textEdit);
         }
 

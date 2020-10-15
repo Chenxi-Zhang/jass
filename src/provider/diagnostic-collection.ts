@@ -44,7 +44,7 @@ vscode.workspace.onDidSaveTextDocument(document => {
     const func = alls.find(func => func.id === call.id);
     if (func) {
       if (func.getTakeCount() !== call.getTakeCount()) { // 参数不一致
-        const loc = new vscode.Range(<number>call.loc.startLine, <number>call.loc.startPosition, <number>call.loc.endLine, <number>call.loc.endPosition);
+        const loc = new vscode.Range(<number>call.loc.startLine, <number>call.loc.start, <number>call.loc.endLine, <number>call.loc.end);
         diagnostics.push(new vscode.Diagnostic(loc, errorString.ParameterInconsistency));
         Collection.set(document.uri, diagnostics);
       }

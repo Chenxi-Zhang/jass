@@ -119,7 +119,7 @@ class CompletionItemProvider implements vscode.CompletionItemProvider {
         items.push(...this.functionCompletionItems);
       }
       if (op.needLocal) {
-        const func = functions.find(x => x.loc && Number.isInteger(x.loc.startLine) && Number.isInteger(x.loc.startPosition) && Number.isInteger(x.loc.endLine) && Number.isInteger(x.loc.endPosition) && new vscode.Range(<number>x.loc.startLine, <number>x.loc.startPosition, <number>x.loc.endLine, <number>x.loc.endPosition).contains(position));
+        const func = functions.find(x => x.loc && Number.isInteger(x.loc.startLine) && Number.isInteger(x.loc.start) && Number.isInteger(x.loc.endLine) && Number.isInteger(x.loc.end) && new vscode.Range(<number>x.loc.startLine, <number>x.loc.start, <number>x.loc.endLine, <number>x.loc.end).contains(position));
         if (func) {
           func.locals().forEach(x => {
             if (x.type && x.id) {
@@ -132,7 +132,7 @@ class CompletionItemProvider implements vscode.CompletionItemProvider {
         }
       }
       if (op.needTake) {
-        const func = functions.find(x => x.loc && Number.isInteger(x.loc.startLine) && Number.isInteger(x.loc.startPosition) && Number.isInteger(x.loc.endLine) && Number.isInteger(x.loc.endPosition) && new vscode.Range(<number>x.loc.startLine, <number>x.loc.startPosition, <number>x.loc.endLine, <number>x.loc.endPosition).contains(position));
+        const func = functions.find(x => x.loc && Number.isInteger(x.loc.startLine) && Number.isInteger(x.loc.start) && Number.isInteger(x.loc.endLine) && Number.isInteger(x.loc.end) && new vscode.Range(<number>x.loc.startLine, <number>x.loc.start, <number>x.loc.endLine, <number>x.loc.end).contains(position));
         if (func) {
           func.takes.forEach(x => {
             const item = new vscode.CompletionItem(x.id, vscode.CompletionItemKind.TypeParameter);

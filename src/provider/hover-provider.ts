@@ -54,7 +54,7 @@ class HoverProvider implements vscode.HoverProvider {
     const content = document.getText();
     const currentProgram: jass.Program = jass.parseEx(content);
 
-    const currentFunc = currentProgram.functionDeclarators().find(x => x.loc && Number.isInteger(x.loc.startLine) && Number.isInteger(x.loc.startPosition) && Number.isInteger(x.loc.endLine) && Number.isInteger(x.loc.endPosition) && new vscode.Range(<number>x.loc.startLine, <number>x.loc.startPosition, <number>x.loc.endLine, <number>x.loc.endPosition).contains(position));
+    const currentFunc = currentProgram.functionDeclarators().find(x => x.loc && Number.isInteger(x.loc.startLine) && Number.isInteger(x.loc.start) && Number.isInteger(x.loc.endLine) && Number.isInteger(x.loc.end) && new vscode.Range(<number>x.loc.startLine, <number>x.loc.start, <number>x.loc.endLine, <number>x.loc.end).contains(position));
     if (currentFunc) {
       const locals = currentFunc.locals();
       for (let index = 0; index < locals.length; index++) {

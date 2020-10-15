@@ -7,21 +7,39 @@ import { Token, tokenize } from "./tokens";
 import { Location } from "./range";
 
 interface Loc {
-    loc: Location | null;
+    loc: Location;
+    equals(another: Loc): boolean;
 }
 
 interface Origin {
     origin(): string;
 }
 
-class NativeDeclarator implements Loc, Origin {
-    public id: string | null = null;
-    public takes: Take[] = [];
-    public returns: string | null = null;
-    public loc: Location | null = null;
+abstract class Declarator implements Loc, Origin {
+    loc: Location;
+    public constructor(start: number, end: number) {
+        this.loc = new Location(start, end);
+    }
+    abstract origin(): string;
+    public equals(that: Loc): boolean {
+        return this.loc.equals(that.loc);
+    }
 
+}
+
+class NativeDeclarator extends Declarator {
+    public id: string;
+    public takes: Take[];
+    public returns: string;
+
+    public constructor(start: number, end: number, id: string, takes: Take[] = [], returns: string = "nothing") {
+        super(start, end);
+        this.id = id;
+        this.takes = takes;
+        this.returns = returns;
+    }
     public origin() {
-        return `native ${this.id} takes ${this.takes.length > 0 ? this.takes.map(x => x.origin()).join(", ") : "nothing"} returns ${this.returns ?? "nothing"}`;
+        return `native ${this.id} takes ${this.takes.length > 0 ? this.takes.map(x => x.origin()).join(", ") : "nothing"} returns ${this.returns}`;
     }
 
     /**
@@ -31,16 +49,15 @@ class NativeDeclarator implements Loc, Origin {
         return this.takes.length;
     }
 
-    public toString = () : string => {
+    public toString = (): string => {
         return `Native<id:${this.id}>`;
     }
 }
 
-class FunctionDeclarator implements Loc, Origin {
+class FunctionDeclarator extends Declarator{
     public id: string | null = null;
     public takes: Take[] = [];
     public returns: string | null = null;
-    public loc: Location = new Location();
 
     public body: Array<LocalDeclarator | CallDeclarator> = [];
 
@@ -67,26 +84,29 @@ class FunctionDeclarator implements Loc, Origin {
         return this.takes.length;
     }
 
-    public toString = () : string => {
+    public toString = (): string => {
         return `Func<Id: ${this.id}>`;
     }
 
 }
 
-class Take implements Loc, Origin {
-    public type: string | null = null;
-    public id: string = "";
-    public loc: Location = new Location()
-
+class Take extends Declarator{
+    public type: string;
+    public id: string;
+    public constructor(start: number, end: number, type: string, id: string) {
+        super(start, end);
+        this.type = type;
+        this.id = id;
+    }
     public origin() {
         return `${this.type} ${this.id}`;
     }
 }
 
 // call 关键字调用方法
-class CallDeclarator implements Loc, Origin {
-    public id: string = "";
-    public params: any[] = [];
+class CallDeclarator extends Declarator{
+    public id: string;
+    public params: Expression[] = [];
     public loc: Location = new Location();
     public origin() {
         return `call ${this.id}(${this.params.map((x, index) => "take_" + 1).join(", ")})`;
@@ -97,6 +117,21 @@ class CallDeclarator implements Loc, Origin {
      */
     public getTakeCount() {
         return this.params.length;
+    }
+}
+
+class Expression extends Declarator {
+    origin(): string {
+    }
+    public tokens: Token[];
+    public returnType: string = "nothing";
+    public constructor(start: number, end: number, tokens: Token[]) {
+        super(start, end);
+        this.tokens = tokens;
+        this.returnType = this.parsedReturnType(tokens); 
+    }
+    parsedReturnType(tokens: Token[]): string {
+        throw new Error("Method not implemented.");
     }
 }
 
@@ -115,7 +150,7 @@ function parseCallDeclarator(tokens: Token[], pos: number, caller: CallDeclarato
                         field++;
                     } else if (tokens[pos] && tokens[pos].isOp() && tokens[pos].value === ")") {
                         caller.loc.endLine = tokens[pos].loc?.endLine ?? 0;
-                        caller.loc.endPosition = tokens[pos].loc?.endPosition ?? 0;
+                        caller.loc.end = tokens[pos].loc?.end ?? 0;
                         break;
                     } else if (tokens[pos] && tokens[pos].isOp() && tokens[pos].value === ",") {
                         paramIndex++;
@@ -138,7 +173,7 @@ function parseCallDeclarator(tokens: Token[], pos: number, caller: CallDeclarato
                 }
             }
             caller.loc.endLine = tokens[pos - 1].loc?.endLine ?? 0;
-            caller.loc.endPosition = tokens[pos - 1].loc?.endPosition ?? 0;
+            caller.loc.end = tokens[pos - 1].loc?.end ?? 0;
         }
     }
     return pos;
@@ -196,11 +231,11 @@ class Comment implements Loc {
     }
 }
 
-class JassError implements Loc  {
+class JassError implements Loc {
     public loc: Location = null as any;
-    public message:string = "";
+    public message: string = "";
 
-    constructor(loc:Location, message:string) {
+    constructor(loc: Location, message: string) {
         this.loc = loc;
         this.message = message;
     }
@@ -210,7 +245,7 @@ class Program {
     public fileName: string | null = null;
     public body: Array<FunctionDeclarator | NativeDeclarator | GlobalDeclarator> = [];
     public comments: Comment[] = [];
-    public errors:JassError[] = [];
+    public errors: JassError[] = [];
 
     public functions() {
         return <(FunctionDeclarator | NativeDeclarator)[]>this.body.filter(s => s instanceof FunctionDeclarator || s instanceof NativeDeclarator);
@@ -226,7 +261,7 @@ class Program {
     }
 
     public description(node: FunctionDeclarator | NativeDeclarator | GlobalDeclarator | LocalDeclarator) {
-        return this.comments.find(x => node.loc && Number.isInteger(node.loc.startLine) && x.loc && Number.isInteger(x.loc.startLine) && (<number>node.loc.startLine - 1) == x.loc.startLine)?.parseConten() ?? "";
+        return this.comments.find(x => x.equals(node))?.parseConten() ?? "";
     }
 }
 
@@ -251,13 +286,13 @@ function start(tokens: Token[], progam: Program) {
     for (let index = 0; index < tokens.length;) {
         const token = tokens[index];
 
-        if (token.type === "id" && token.value === "native") {
+        if (token.kind === "id" && token.value === "native") {
             index = parseNative(tokens, index, progam, new NativeDeclarator);
             index++;
-        } else if (token.type === "id" && token.value === "function") {
+        } else if (token.kind === "id" && token.value === "function") {
             index = parseFunction(tokens, index, progam, new FunctionDeclarator);
             index++;
-        } else if (token.type === "id" && token.value === "globals") {
+        } else if (token.kind === "id" && token.value === "globals") {
             parseGlobals(tokens, index, progam, new Globals);
             // globals识别存在问题,因而暂时不对globals支持
             index++;
@@ -277,9 +312,9 @@ function removeComment(tokens: Token[], progam: Program) {
     const ts: Token[] = [];
     for (let index = 0; index < tokens.length; index++) {
         const token = tokens[index];
-        if (token.type === "block_comment") {
+        if (token.kind === "block_comment") {
             continue;
-        } else if (token.type === "comment") {
+        } else if (token.kind === "comment") {
             // 获取单行注释并保存在progam
             const comment = new Comment();
             comment.content = token.value;
@@ -293,28 +328,28 @@ function removeComment(tokens: Token[], progam: Program) {
 }
 
 function parseNative(tokens: Token[], pos: number, progam: Program, native: NativeDeclarator): number {
-    if (tokens[pos].type === "id" && tokens[pos].value === "native") {
+    if (tokens[pos].kind === "id" && tokens[pos].value === "native") {
         native.loc = new Location();
         native.loc.startLine = tokens[pos].loc?.startLine ?? 0;
-        native.loc.startPosition = tokens[pos].loc?.startPosition ?? 0;
+        native.loc.start = tokens[pos].loc?.start ?? 0;
         pos++;
         progam.body.push(native);
-        if (tokens[pos].type === "id") {
+        if (tokens[pos].kind === "id") {
             native.id = tokens[pos].value;
             pos++;
-            if (tokens[pos] && tokens[pos].type === "id" && tokens[pos].value === "takes") {
+            if (tokens[pos] && tokens[pos].kind === "id" && tokens[pos].value === "takes") {
                 pos++;
                 if (tokens[pos].isId() && tokens[pos].value === "nothing") {
                     pos++;
                 } else {
                     pos = parseTakes(tokens, pos, native);
                 }
-                if (tokens[pos] && tokens[pos].type === "id" && tokens[pos].value === "returns") {
+                if (tokens[pos] && tokens[pos].kind === "id" && tokens[pos].value === "returns") {
                     pos++;
-                    if (tokens[pos].type === "id") {
+                    if (tokens[pos].kind === "id") {
                         native.returns = tokens[pos].value;
                         (<Location>native.loc).endLine = tokens[pos].loc?.endLine ?? 0;
-                        (<Location>native.loc).endPosition = tokens[pos].loc?.endPosition ?? 0;
+                        (<Location>native.loc).end = tokens[pos].loc?.end ?? 0;
                     }
                 }
             }
@@ -333,7 +368,7 @@ function parseTakes(tokens: Token[], pos: number, f: FunctionDeclarator | Native
                 take = new Take();
                 take.loc = new Location();
                 take.loc.startLine = token.loc?.startLine ?? 0;
-                take.loc.startPosition = token.loc?.startPosition ?? 0;
+                take.loc.start = token.loc?.start ?? 0;
                 f.takes.push(take);
                 take.type = token.value;
                 state = 1;
@@ -348,14 +383,14 @@ function parseTakes(tokens: Token[], pos: number, f: FunctionDeclarator | Native
                 take.id = token.value;
                 if (take.loc) {
                     take.loc.endLine = token.loc?.endLine ?? 0;
-                    take.loc.endPosition = token.loc?.endPosition ?? 0;
+                    take.loc.end = token.loc?.end ?? 0;
                 }
                 state = 2;
             } else {
                 return index;
             }
         } else if (state === 2) {
-            if (token.type === "op" && token.value === ",") {
+            if (token.kind === "op" && token.value === ",") {
                 state = 0;
             } else {
                 return index;
@@ -374,24 +409,24 @@ function parseFunction(tokens: Token[], pos: number, progam: Program, func: Func
     option = {
         supportZinc: true
     };
-    if (tokens[pos].type === "id" && tokens[pos].value === "function") {
+    if (tokens[pos].kind === "id" && tokens[pos].value === "function") {
         const loc = new Location();
         loc.startLine = tokens[pos].loc?.startLine ?? 0;
-        loc.startPosition = tokens[pos].loc?.startPosition ?? 0;
+        loc.start = tokens[pos].loc?.start ?? 0;
         pos++;
         func.loc = loc;
         progam.body.push(func);
-        if (tokens[pos].type === "id") {
+        if (tokens[pos].kind === "id") {
             func.id = tokens[pos].value;
             pos++;
-            if (tokens[pos] && tokens[pos].type === "id" && tokens[pos].value === "takes") {
+            if (tokens[pos] && tokens[pos].kind === "id" && tokens[pos].value === "takes") {
                 pos++;
                 if (tokens[pos].isId() && tokens[pos].value === "nothing") {
                     pos++;
                 } else {
                     pos = parseTakes(tokens, pos, func);
                 }
-                if (tokens[pos].type === "id" && tokens[pos].value === "returns") {
+                if (tokens[pos].kind === "id" && tokens[pos].value === "returns") {
                     pos++;
                     if (tokens[pos] && tokens[pos].isId() && tokens[pos].value === "nothing") {
                         const outs: Token[] = [];
@@ -399,7 +434,7 @@ function parseFunction(tokens: Token[], pos: number, progam: Program, func: Func
 
                         parseFunctionBody(outs, func);
                         loc.endLine = tokens[pos].loc?.endLine ?? 0;
-                        loc.endPosition = tokens[pos].loc?.endPosition ?? 0;
+                        loc.end = tokens[pos].loc?.end ?? 0;
                     }
                     else if (tokens[pos].isId()) {
                         func.returns = tokens[pos].value;
@@ -408,30 +443,30 @@ function parseFunction(tokens: Token[], pos: number, progam: Program, func: Func
 
                         parseFunctionBody(outs, func);
                         loc.endLine = tokens[pos].loc?.endLine ?? 0;
-                        loc.endPosition = tokens[pos].loc?.endPosition ?? 0;
+                        loc.end = tokens[pos].loc?.end ?? 0;
                     }
                 }
             }
             // zinc function parse
-            else if (option?.supportZinc && tokens[pos] && tokens[pos].type === "op" && tokens[pos].value === "(") { // zinc takes
+            else if (option?.supportZinc && tokens[pos] && tokens[pos].kind === "op" && tokens[pos].value === "(") { // zinc takes
                 pos = parseTakes(tokens, pos + 1, func);
-                if (tokens[pos].type === "op" && tokens[pos].value === ")") {
+                if (tokens[pos].kind === "op" && tokens[pos].value === ")") {
                     pos++;
-                    if (tokens[pos].type === "op" && tokens[pos].value === "->") {
+                    if (tokens[pos].kind === "op" && tokens[pos].value === "->") {
                         pos++;
-                        if (tokens[pos].type === "id") {
+                        if (tokens[pos].kind === "id") {
                             func.returns = tokens[pos].value;
                             pos++;
-                            if (tokens[pos].type === "op" && tokens[pos].value === "{") {
+                            if (tokens[pos].kind === "op" && tokens[pos].value === "{") {
                                 pos = collectZincFunctionBody(tokens, pos + 1, func);
                                 loc.endLine = tokens[pos].loc?.endLine ?? 0;
-                                loc.endPosition = tokens[pos].loc?.endPosition ?? 0;
+                                loc.end = tokens[pos].loc?.end ?? 0;
                             }
                         }
-                    } else if (tokens[pos].type === "op" && tokens[pos].value === "{") {
+                    } else if (tokens[pos].kind === "op" && tokens[pos].value === "{") {
                         pos = collectZincFunctionBody(tokens, pos + 1, func);
                         loc.endLine = tokens[pos].loc?.endLine ?? 0;
-                        loc.endPosition = tokens[pos].loc?.endPosition ?? 0;
+                        loc.end = tokens[pos].loc?.end ?? 0;
                     }
                 }
             }
@@ -461,21 +496,21 @@ function parseFunctionBody(tokens: Token[], func: FunctionDeclarator) {
             local = new LocalDeclarator();
             local.loc = new Location();
             local.loc.startLine = values[0].loc?.startLine ?? 0;
-            local.loc.startPosition = values[0].loc?.startPosition ?? 0;
+            local.loc.start = values[0].loc?.start ?? 0;
             func.body.push(local);
             if (values[1] && values[1].isId()) {
                 local.type = values[1].value;
                 if (values[2] && values[2].isId()) {
                     local.id = values[2].value;
                     local.loc.endLine = values[2].loc?.endLine ?? 0;
-                    local.loc.endPosition = values[2].loc?.endPosition ?? 0;
+                    local.loc.end = values[2].loc?.end ?? 0;
                 }
             }
         } else if (values[0].isId() && values[0].value === "call") {
 
             const caller = new CallDeclarator();
             caller.loc.startLine = values[0].loc?.startLine ?? 0;
-            caller.loc.startPosition = values[0].loc?.startPosition ?? 0;
+            caller.loc.start = values[0].loc?.start ?? 0;
             func.body.push(caller);
             parseCallDeclarator(values, 1, caller);
 
@@ -487,7 +522,7 @@ function parseFunctionBody(tokens: Token[], func: FunctionDeclarator) {
 function collectFunctionBody(tokens: Token[], pos: number, outs: Token[]) {
     let token: Token = null as any;
     while (token = tokens[pos]) {
-        if (token.type === "id" && token.value === "endfunction") {
+        if (token.kind === "id" && token.value === "endfunction") {
             break;
         }
         outs.push(token);
@@ -500,11 +535,11 @@ function collectZincFunctionBody(tokens: Token[], pos: number, func: FunctionDec
     let token: Token = null as any;
     let field: number = 0;
     while (token = tokens[pos]) {
-        if (field === 0 && token.type === "op" && token.value === "}") {
+        if (field === 0 && token.kind === "op" && token.value === "}") {
             break;
-        } else if (token.type === "op" && token.value === "{") {
+        } else if (token.kind === "op" && token.value === "{") {
             field++;
-        } else if (token.type === "op" && token.value === "}") {
+        } else if (token.kind === "op" && token.value === "}") {
             field--;
         }
         func.bodyTokens.push(token);
@@ -522,7 +557,7 @@ function collectZincFunctionBody(tokens: Token[], pos: number, func: FunctionDec
  * @param globals 
  */
 function parseGlobals(tokens: Token[], pos: number, progam: Program, globals: Globals) {
-    if (tokens[pos].type === "id" && tokens[pos].value === "globals") {
+    if (tokens[pos].kind === "id" && tokens[pos].value === "globals") {
         // progam.body.push(globals);
         pos++;
         let token: Token | null = null;
@@ -569,7 +604,7 @@ function parseGlobals(tokens: Token[], pos: number, progam: Program, globals: Gl
                         if (!global.loc) {
                             global.loc = new Location();
                             global.loc.startLine = values[index].loc?.startLine ?? 0;
-                            global.loc.startPosition = values[index].loc?.startPosition ?? 0;
+                            global.loc.start = values[index].loc?.start ?? 0;
                         }
                         global.type = values[index].value;
                         if (values[index + 1] && values[index + 1].isId() && values[index + 1].value === "array") {
@@ -577,12 +612,12 @@ function parseGlobals(tokens: Token[], pos: number, progam: Program, globals: Gl
                             if (values[index + 2] && values[index + 2].isId()) {
                                 global.id = values[index + 2].value;
                                 global.loc.endLine = values[index + 2].loc?.endLine ?? 0;
-                                global.loc.endPosition = values[index + 2].loc?.endPosition ?? 0;
+                                global.loc.end = values[index + 2].loc?.end ?? 0;
                             }
                         } else if (values[index + 1] && values[index + 1].isId()) {
                             global.id = values[index + 1].value;
                             global.loc.endLine = values[index + 1].loc?.endLine ?? 0;
-                            global.loc.endPosition = values[index + 1].loc?.endPosition ?? 0;
+                            global.loc.end = values[index + 1].loc?.end ?? 0;
                         }
                     }
                 }
@@ -621,7 +656,7 @@ function parseEx(content: string) {
     let inZinc = false;
     let inGlobals = false;
     let inFunction = false;
-    let o:FunctionDeclarator = null as any;
+    let o: FunctionDeclarator = null as any;
 
     for (let index = 0; index < lines.length; index++) {
         const line = lines[index];
@@ -646,7 +681,7 @@ function parseEx(content: string) {
             comment.loc = tokens[0].loc;
             program.comments.push(comment);
         } else if (inZinc) {
-            
+
         } else if (tokens[0].isId() && tokens[0].value == "globals") {
             if (inGlobals) {
                 program.errors.push(new JassError(tokens[0].loc, "Duplicate global declarations"))
@@ -664,22 +699,22 @@ function parseEx(content: string) {
                 tokens.shift();
             }
             if (tokens.length == 0) continue;
-            let constantToken:Token|undefined = undefined;
+            let constantToken: Token | undefined = undefined;
             if (tokens[0].isId() && tokens[0].value == "constant") {
                 constantToken = tokens.shift();
             }
             if (tokens.length == 0) continue;
-            let typeToken:Token|undefined = undefined;
+            let typeToken: Token | undefined = undefined;
             if (tokens[0].isId()) {
                 typeToken = tokens.shift();
             }
             if (tokens.length == 0) continue;
-            let arrayToken:Token|undefined = undefined;
+            let arrayToken: Token | undefined = undefined;
             if (tokens[0].isId() && tokens[0].value == "array") {
                 arrayToken = tokens.shift();
             }
             if (tokens.length == 0) continue;
-            let idToken:Token|undefined = undefined;
+            let idToken: Token | undefined = undefined;
             if (tokens[0].isId()) {
                 idToken = tokens.shift();
             }
@@ -689,12 +724,12 @@ function parseEx(content: string) {
                 global.id = idToken.value;
                 global.loc.startLine = index;
                 global.loc.endLine = index;
-                global.loc.endPosition = idToken.loc.endPosition;
+                global.loc.end = idToken.loc.end;
                 if (constantToken) {
                     global.flags.add("constant");
-                    global.loc.startPosition = constantToken.loc.startPosition;
+                    global.loc.start = constantToken.loc.start;
                 } else {
-                    global.loc.startPosition = typeToken.loc.startPosition;
+                    global.loc.start = typeToken.loc.start;
                 }
                 if (arrayToken) {
                     global.flags.add("array");
@@ -715,8 +750,8 @@ function parseEx(content: string) {
                 inFunction = true;
                 program.body.push(o);
                 o.loc.startLine = index;
-                o.loc.startPosition = functionToken.loc.startPosition;
-                if(!tokens[0]) continue;
+                o.loc.start = functionToken.loc.start;
+                if (!tokens[0]) continue;
                 if (tokens[0].isId()) {
                     o.id = tokens[0].value;
                     tokens.shift();
@@ -732,7 +767,7 @@ function parseEx(content: string) {
                 const returnsIndex = tokens.findIndex(token => {
                     return token.isId() && token.value == "returns";
                 });
-                let takesTokens:Token[] = null as any;
+                let takesTokens: Token[] = null as any;
                 if (returnsIndex == -1) {
                     takesTokens = tokens;
                 } else {
@@ -750,8 +785,8 @@ function parseEx(content: string) {
                         take.id = takesTokens[i + 1].value;
                         take.loc.startLine = index;
                         take.loc.endLine = index;
-                        take.loc.startPosition = takesTokens[i].loc.startPosition;
-                        take.loc.endPosition = takesTokens[i + 1].loc.endPosition;
+                        take.loc.start = takesTokens[i].loc.start;
+                        take.loc.end = takesTokens[i + 1].loc.end;
                         o.takes.push(take);
                     }
                     if (!takesTokens[i + 2] || !takesTokens[i + 2].isOp() || takesTokens[i + 2].value != ",") {
@@ -762,7 +797,7 @@ function parseEx(content: string) {
         } else if (tokens[0].isId() && tokens[0].value == "endfunction") {
             if (inFunction) {
                 o.loc.endLine = index;
-                o.loc.endPosition = tokens[0].loc.endPosition;
+                o.loc.end = tokens[0].loc.end;
                 inFunction = false;
             } else {
                 program.errors.push(new JassError(tokens[0].loc, "Repeated Endfunction statements"))
@@ -771,16 +806,16 @@ function parseEx(content: string) {
             if (tokens[0].isId() && tokens[0].value == "local") {
                 const localToken = tokens[0];
                 tokens.shift();
-                let typeToken:Token|undefined = undefined;
+                let typeToken: Token | undefined = undefined;
                 if (tokens[0].isId()) {
                     typeToken = tokens.shift();
                 }
                 if (!typeToken) continue;
-                let arrayToken:Token|undefined = undefined;
+                let arrayToken: Token | undefined = undefined;
                 if (tokens[0] && tokens[0].isId() && <string>tokens[0].value == "array") {
                     arrayToken = tokens.shift();
                 }
-                let idToken:Token|undefined = undefined;
+                let idToken: Token | undefined = undefined;
                 if (tokens[0].isId()) {
                     idToken = tokens.shift();
                 }
@@ -793,12 +828,12 @@ function parseEx(content: string) {
                 }
                 local.loc.startLine = index;
                 local.loc.endLine = index;
-                local.loc.startPosition = localToken.loc.startPosition;
-                local.loc.endPosition = idToken.loc.endPosition;
+                local.loc.start = localToken.loc.start;
+                local.loc.end = idToken.loc.end;
                 o.body.push(local);
             } else if (tokens[0].isId() && tokens[0].value == "call") {
                 const callToken = <Token>tokens.shift();
-                let idToken:Token|undefined = undefined;
+                let idToken: Token | undefined = undefined;
                 if (tokens[0].isId()) {
                     idToken = tokens.shift();
                 }
@@ -806,7 +841,7 @@ function parseEx(content: string) {
                 let firstToken = tokens.shift();
                 if (!firstToken) continue;
                 if (!firstToken.isOp() || firstToken.value != "(") continue;
-                const caller:CallDeclarator = new CallDeclarator();
+                const caller: CallDeclarator = new CallDeclarator();
                 caller.id = idToken.value;
                 let field = 0;
                 let count = 0;
@@ -844,14 +879,14 @@ function parseEx(content: string) {
                 // let endToken = tokens.shift();
                 // if (!endToken) continue;
                 // if (!endToken.isOp() || endToken.value != ")") continue;
-                
+
             }
         }
     }
     return program;
 }
 
-function parse(content: string) : Program {
+function parse(content: string): Program {
     const tokens = tokenize(content);
     return parsing(tokens);
     // return parseLines(content);

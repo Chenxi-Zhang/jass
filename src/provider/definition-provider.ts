@@ -56,13 +56,13 @@ vscode.languages.registerDefinitionProvider("jass", new class NewDefinitionProvi
     const locations = new Array<vscode.Location>();
     
     // console.log(currentProgram.functions().length)
-    const currentFunc = currentProgram.functionDeclarators().find(x => x.loc && Number.isInteger(x.loc.startLine) && Number.isInteger(x.loc.startPosition) && Number.isInteger(x.loc.endLine) && Number.isInteger(x.loc.endPosition) && new vscode.Range(<number>x.loc.startLine, <number>x.loc.startPosition, <number>x.loc.endLine, <number>x.loc.endPosition).contains(position));
+    const currentFunc = currentProgram.functionDeclarators().find(x => x.loc && Number.isInteger(x.loc.startLine) && Number.isInteger(x.loc.start) && Number.isInteger(x.loc.endLine) && Number.isInteger(x.loc.end) && new vscode.Range(<number>x.loc.startLine, <number>x.loc.start, <number>x.loc.endLine, <number>x.loc.end).contains(position));
     if (currentFunc) {
       const locals = currentFunc.locals();
       for (let index = 0; index < locals.length; index++) {
         const local = locals[index];
         if (local.id && local.id === key) {
-          const location = new vscode.Location(document.uri, new vscode.Range(<number>local.loc?.startLine, <number>local.loc?.startPosition, <number>local.loc?.endLine, <number>local.loc?.endPosition));
+          const location = new vscode.Location(document.uri, new vscode.Range(<number>local.loc?.startLine, <number>local.loc?.start, <number>local.loc?.endLine, <number>local.loc?.end));
           locations.push(location);
           break;
         }
@@ -72,7 +72,7 @@ vscode.languages.registerDefinitionProvider("jass", new class NewDefinitionProvi
       for (let index = 0; index < takes.length; index++) {
         const take = takes[index];
         if (take.id && take.id === key) {
-          const location = new vscode.Location(document.uri, new vscode.Range(<number>take.loc?.startLine, <number>take.loc?.startPosition, <number>take.loc?.endLine, <number>take.loc?.endPosition));
+          const location = new vscode.Location(document.uri, new vscode.Range(<number>take.loc?.startLine, <number>take.loc?.start, <number>take.loc?.endLine, <number>take.loc?.end));
           locations.push(location);
           break;
         }
@@ -107,7 +107,7 @@ vscode.languages.registerDefinitionProvider("jass", new class NewDefinitionProvi
       for (let i = 0; i < functions.length; i++) {
         const func = functions[i];
         if (func.id && func.id === key) {
-          const location = new vscode.Location(vscode.Uri.parse(`file:${program.fileName}`, false), new vscode.Range(<number>func.loc?.startLine, <number>func.loc?.startPosition, <number>func.loc?.endLine, <number>func.loc?.endPosition));
+          const location = new vscode.Location(vscode.Uri.parse(`file:${program.fileName}`, false), new vscode.Range(<number>func.loc?.startLine, <number>func.loc?.start, <number>func.loc?.endLine, <number>func.loc?.end));
           locations.push(location);
           metch = true;
           break;
@@ -120,7 +120,7 @@ vscode.languages.registerDefinitionProvider("jass", new class NewDefinitionProvi
       for (let i = 0; i < globals.length; i++) {
         const global = globals[i];
         if (global.id && global.id === key) {
-          const location = new vscode.Location(vscode.Uri.parse(`file:${program.fileName}`, false), new vscode.Range(<number>global.loc?.startLine, <number>global.loc?.startPosition, <number>global.loc?.endLine, <number>global.loc?.endPosition));
+          const location = new vscode.Location(vscode.Uri.parse(`file:${program.fileName}`, false), new vscode.Range(<number>global.loc?.startLine, <number>global.loc?.start, <number>global.loc?.endLine, <number>global.loc?.end));
           locations.push(location);
           metch = true;
           break;
