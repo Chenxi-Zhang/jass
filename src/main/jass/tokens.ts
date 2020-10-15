@@ -5,15 +5,22 @@ enum TokenKind {
     PLUS,
     MINUS,
     STAR,
-    div,
-    lparen,
-    rparen,
-    lsquare,
-    rsquare,
-    lcurly,
-    rcurly,
-    eq,
-    assign,
+    DIV,
+    LPAREN,
+    RPAREN,
+    LSQUARE,
+    RSQUARE,
+    LCURLY,
+    RCURLY,
+    EQ,
+    ASSIGN,
+    COMMENT,
+    GE,
+    GT,
+    LE,
+    LT,
+    HEX_INT,
+    INT,
 
 
 
@@ -21,9 +28,9 @@ enum TokenKind {
 
 class Token {
     public type: TokenKind;
-    public value: string;
+    public value: string | null;
     public loc: Location = new Location();
-    constructor(type: TokenKind, value: string) {
+    constructor(type: TokenKind, value: string | null = null) {
         this.type = type;
         this.value = value;
     }
@@ -141,28 +148,63 @@ class Tokenlizer {
             } else {
                 switch (char) {
                     case '+':
-                        this.pushCharToken('+');
+                        this.pushToken(TokenKind.PLUS);
                         break;
                     case '-':
-                        this.pushCharToken('-');
+                        this.pushToken(TokenKind.MINUS);
                         break;
                     case '_':
                         this.lexIdentifier(chars);
                         break;
                     case '*':
-                        this.pushCharToken('*');
+                        this.pushToken(TokenKind.STAR);
                         break;
                     case '/':
-                        if (this.twoSlash(chars)) {
+                        if (this.isPairChars(chars, '//')) {
                             this.eatOnelineComment(chars);
-                        } else if (this.slashStart(chars)) {
+                        } else if (this.isPairChars(chars, '/*')) {
                             this.isBlockComment = true;
+                        } else {
+                            this.pushToken(TokenKind.DIV);
                         }
-                        this.pushCharToken('*');
                         break;
                     case '(':
-                        this.pushCharToken('(');
+                        this.pushToken(TokenKind.LPAREN);
                         break;
+                    case ')':
+                        this.pushToken(TokenKind.RPAREN);
+                        break;
+                    case '[':
+                        this.pushToken(TokenKind.LSQUARE);
+                        break;
+                    case ']':
+                        this.pushToken(TokenKind.RSQUARE);
+                        break;
+                    case '>':
+                        if (this.isPairChars(chars, '>=')) {
+                            this.pushPairToken(TokenKind.GE);
+                        } else {
+                            this.pushToken(TokenKind.GT);
+                        }
+                        break;
+                    case '<':
+                        if (this.isPairChars(chars, '<=')) {
+                            this.pushPairToken(TokenKind.LE);
+                        } else {
+                            this.pushToken(TokenKind.LT);
+                        }
+                        break;
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                    case '8':
+                    case '9':
+                        this.lexNumericLiteral(chars, char === '0');
                     default:
                         break;
                 }
@@ -172,14 +214,79 @@ class Tokenlizer {
             this.eatBlockComment(chars);
         }
     }
+
+    // REAL_LITERAL :
+    // ('.' (DECIMAL_DIGIT)+ (EXPONENT_PART)? (REAL_TYPE_SUFFIX)?) |
+    // ((DECIMAL_DIGIT)+ '.' (DECIMAL_DIGIT)+ (EXPONENT_PART)? (REAL_TYPE_SUFFIX)?) |
+    // ((DECIMAL_DIGIT)+ (EXPONENT_PART) (REAL_TYPE_SUFFIX)?) |
+    // ((DECIMAL_DIGIT)+ (REAL_TYPE_SUFFIX));
+    // fragment INTEGER_TYPE_SUFFIX : ( 'L' | 'l' );
+    // fragment HEX_DIGIT :
+    // '0'|'1'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9'|'A'|'B'|'C'|'D'|'E'|'F'|'a'|'b'|'c'|'d'|'e'|'f';
+    //
+    // fragment EXPONENT_PART : 'e' (SIGN)* (DECIMAL_DIGIT)+ | 'E' (SIGN)*
+    // (DECIMAL_DIGIT)+ ;
+    // fragment SIGN : '+' | '-' ;
+    // fragment REAL_TYPE_SUFFIX : 'F' | 'f' | 'D' | 'd';
+    // INTEGER_LITERAL
+    // : (DECIMAL_DIGIT)+ (INTEGER_TYPE_SUFFIX)?;
+    lexNumericLiteral(chars: string[], isFirstZero: boolean) {
+        let isReal = false;
+        const start = this.curPos;
+        const ch2 = chars[this.curPos + 1];
+        const isHex = (ch2 === 'x' || ch2 === 'X');
+        // deal with hexadecimal
+        if (isFirstZero && isHex) {
+            this.curPos++;
+            do {
+                this.curPos++;
+            } while (this.isHexadecimalDigit(chars[this.curPos]));
+            this.addToken(TokenKind.HEX_INT, chars.slice(start + 2, this.curPos).join(), start, this.curPos, this.curLineNo);
+            return;
+        }
+        // real numbers must have leading digits
+
+        // Consume first part of number
+        do {
+            this.curPos++;
+        } while (this.isDigit(chars[this.curPos]))
+        // a '.' indicates this number is a real
+        const ch = chars[this.curPos];
+        if (ch === '.') {
+            isReal = true;
+            const dotPos = this.curPos;
+            do {
+                this.curPos++;
+            } while (this.isDigit(chars[this.curPos]));
+            if (this.curPos === dotPos + 1) {
+                // the number is something like '3.'. It is really an int but may be
+				// part of something like '3.toString()'. In this case process it as
+                // an int and leave the dot as a separate token.
+                this.curPos = dotPos;
+                this.addToken(TokenKind.INT, chars.slice(start, this.curPos).join(), start, this.curPos, this.curLineNo);
+            }
+
+        }
+    }
+    isDigit(char: string) {
+        return _isNumerical(char);
+    }
+    isHexadecimalDigit(char: string) {
+        return _isNumerical_16(char);
+    }
+    isPairChars(chars: string[], charPair: string) {
+        return (charPair.length == 2 &&
+            charPair[0] === chars[this.curPos] &&
+            charPair[1] === chars[this.curPos + 1])
+    }
     slashStart(chars: string[]) {
-        return chars[this.curPos+1] === '*';
+        return chars[this.curPos + 1] === '*';
     }
     eatOnelineComment(chars: string[]) {
         throw new Error("Method not implemented.");
     }
     twoSlash(chars: string[]) {
-        return chars[this.curPos+1] === '/';
+        return chars[this.curPos + 1] === '/';
     }
     eatBlockComment(chars: string[]) {
         throw new Error("Method not implemented.");
@@ -201,10 +308,15 @@ class Tokenlizer {
             chars.slice(this.curPos, this.curPos + 4).join() === "and " ||
             chars.slice(this.curPos, this.curPos + 4).join() === "not ")
     }
-    pushCharToken(char: string) {
+    pushToken(type: TokenKind, value: string | null = null) {
         const start = this.curPos;
         this.curPos++;
-        this.addToken("op", char, start, this.curPos, this.curLineNo);
+        this.addToken(type, value, start, this.curPos, this.curLineNo);
+    }
+    pushPairToken(type: TokenKind, value: string | null = null) {
+        const start = this.curPos;
+        this.curPos += 2;
+        this.addToken(type, value, start, this.curPos, this.curLineNo);
     }
     lexIdentifier(chars: string[]) {
         const start = this.curPos;
@@ -212,9 +324,9 @@ class Tokenlizer {
             this.curPos++;
         } while (this.isIdentifier(chars[this.curPos]));
         const subarray = chars.slice(start, this.curPos);
-        this.addToken('id', subarray.join(), start, this.curPos, this.curLineNo);
+        this.addToken(TokenKind.ID, subarray.join(), start, this.curPos, this.curLineNo);
     }
-    addToken(type: string, value: string, startPos: number, endPos: number, line: number) {
+    addToken(type: TokenKind, value: string | null, startPos: number, endPos: number, line: number) {
         const token = new Token(type, value);
         token.loc = new Location;
         token.loc.startLine = line;
