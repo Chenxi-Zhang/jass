@@ -21,6 +21,7 @@ enum TokenKind {
     LT,
     HEX_INT,
     INT,
+    DOUBLE,
 
 
 
@@ -205,6 +206,11 @@ class Tokenlizer {
                     case '8':
                     case '9':
                         this.lexNumericLiteral(chars, char === '0');
+                        break;
+                    case ' ':
+                    case '\t':
+                    case '\r':
+                    case '\n':
                     default:
                         break;
                 }
@@ -245,7 +251,6 @@ class Tokenlizer {
             return;
         }
         // real numbers must have leading digits
-
         // Consume first part of number
         do {
             this.curPos++;
@@ -260,12 +265,17 @@ class Tokenlizer {
             } while (this.isDigit(chars[this.curPos]));
             if (this.curPos === dotPos + 1) {
                 // the number is something like '3.'. It is really an int but may be
-				// part of something like '3.toString()'. In this case process it as
+                // part of something like '3.toString()'. In this case process it as
                 // an int and leave the dot as a separate token.
                 this.curPos = dotPos;
                 this.addToken(TokenKind.INT, chars.slice(start, this.curPos).join(), start, this.curPos, this.curLineNo);
+                return;
             }
-
+        }
+        if (isReal) {
+            this.addToken(TokenKind.DOUBLE, chars.slice(start, this.curPos).join(), start, this.curPos, this.curLineNo);
+        } else {
+            this.addToken(TokenKind.INT, chars.slice(start, this.curPos).join(), start, this.curPos, this.curLineNo);
         }
     }
     isDigit(char: string) {
